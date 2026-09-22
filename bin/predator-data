@@ -1,0 +1,114 @@
+#!/bin/bash
+# predator-data: Fast telemetry provider for Omarchy Predator Turbo Plugin
+
+SYSFS_TURBO="/sys/devices/platform/acer-wmi/turbo_mode"
+
+write_turbo() {
+    local val="$1"
+    if [ ! -f "$SYSFS_TURBO" ]; then
+        return 1
+    fi
+
+    if [ -w "$SYSFS_TURBO" ]; then
+        echo "$val" > "$SYSFS_TURBO" 2>/dev/null
+    else
+        # If sysfs is not yet world-writable, use pkexec for non-hanging polkit prompt
+        if command -v pkexec >/dev/null 2>&1 && [ -n "$WAYLAND_DISPLAY" ]; then
+            pkexec sh -c "echo $val > $SYSFS_TURBO" 2>/dev/null || true
+        else
+            echo "$val" > "$SYSFS_TURBO" 2>/dev/null || true
+        fi
+    fi
+}
+
+# Handle toggle action if requested
+if [ "$1" = "--toggle" ]; then
+    if [ -f "$SYSFS_TURBO" ]; then
+        VAL=$(cat "$SYSFS_TURBO" 2>/dev/null || echo 0)
+        if [ "$VAL" = "1" ]; then
+            write_turbo 0
+        else
+            write_turbo 1
+        fi
+    fi
+    exit 0
+fi
+
+if [ "$1" = "--set" ]; then
+    TARGET="${2:-0}"
+    write_turbo "$TARGET"
+    exit 0
+fi
+
+# 1. Read Turbo status
+TURBO=false
+if [ -f "$SYSFS_TURBO" ]; then
+    TURBO_VAL=$(cat "$SYSFS_TURBO" 2>/dev/null || echo 0)
+    [ "$TURBO_VAL" = "1" ] && TURBO=true
+fi
+
+# 2. Read Fan speeds from hwmon
+CPU_RPM=0
+GPU_RPM=0
+for h in /sys/class/hwmon/hwmon*; do
+    if [ -f "$h/name" ] && grep -q -E "^(acer|facer)$" "$h/name" 2>/dev/null; then
+        [ -f "$h/fan1_input" ] && CPU_RPM=$(cat "$h/fan1_input" 2>/dev/null || echo 0)
+        [ -f "$h/fan2_input" ] && GPU_RPM=$(cat "$h/fan2_input" 2>/dev/null || echo 0)
+        break
+    fi
+done
+
+# If fans report 0 but Turbo is ON, Turbo forces fans to maximum (~5400 RPM)
+if [ "$TURBO" = "true" ] && [ "$CPU_RPM" -eq 0 ]; then
+    CPU_RPM=5400
+    GPU_RPM=5600
+fi
+
+# 3. Read GPU telemetry via nvidia-smi
+GPU_MHZ=0
+GPU_MEM_MHZ=0
+GPU_TEMP=0
+GPU_PWR=0
+GPU_NAME="RTX 2060"
+
+if command -v nvidia-smi >/dev/null 2>&1; then
+    NVSMI_OUT=$(nvidia-smi --query-gpu=clocks.gr,clocks.mem,temperature.gpu,power.draw,name --format=csv,noheader,nounits 2>/dev/null || true)
+    if [ -n "$NVSMI_OUT" ]; then
+        IFS=',' read -r G_CLK G_MEM G_TMP G_PWR G_NM <<< "$NVSMI_OUT"
+        GPU_MHZ=$(echo "$G_CLK" | xargs)
+        GPU_MEM_MHZ=$(echo "$G_MEM" | xargs)
+        GPU_TEMP=$(echo "$G_TMP" | xargs)
+        GPU_PWR=$(echo "$G_PWR" | xargs)
+        GPU_NAME=$(echo "$G_NM" | xargs)
+    fi
+fi
+
+# 4. Read CPU frequency
+CPU_GHZ="0.00"
+TOTAL_FREQ=0
+COUNT=0
+for f in /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq; do
+    FREQ=$(cat "$f" 2>/dev/null || echo 0)
+    TOTAL_FREQ=$((TOTAL_FREQ + FREQ))
+    COUNT=$((COUNT + 1))
+done
+
+if [ "$COUNT" -gt 0 ]; then
+    AVG_KHZ=$((TOTAL_FREQ / COUNT))
+    CPU_GHZ=$(awk -v k="$AVG_KHZ" 'BEGIN { printf "%.2f", k / 1000000 }')
+fi
+
+# 5. Output JSON
+cat << EOF
+{
+  "turbo": $TURBO,
+  "cpu_fan_rpm": $CPU_RPM,
+  "gpu_fan_rpm": $GPU_RPM,
+  "gpu_mhz": $GPU_MHZ,
+  "gpu_mem_mhz": $GPU_MEM_MHZ,
+  "gpu_temp": $GPU_TEMP,
+  "gpu_power": "$GPU_PWR",
+  "gpu_name": "$GPU_NAME",
+  "cpu_ghz": "$CPU_GHZ"
+}
+EOF

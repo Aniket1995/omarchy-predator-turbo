@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "predator-turbo",
+  "name": "Predator Turbo",
+  "version": "1.0.0",
+  "author": "aniketb",
+  "description": "Hardware Turbo Mode controller, fan speed monitor, and hardware telemetry for Acer Predator laptops",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Predator Turbo",
+    "description": "Hardware Turbo Mode & Fan Speed Control for Acer Predator",
+    "category": "Hardware",
+    "defaultSection": "right",
+    "allowMultiple": false
+  }
+}
