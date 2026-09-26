@@ -18,6 +18,18 @@ write_turbo() {
 
     if [ -w "$SYSFS_TURBO" ]; then
         if printf '%s\n' "$val" > "$SYSFS_TURBO"; then
+            if [ "$val" = "1" ]; then
+                command -v powerprofilesctl >/dev/null 2>&1 && powerprofilesctl set performance 2>/dev/null || true
+                command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -pm 1 2>/dev/null || true
+                for h in "${HOME}/.config/predator/turbo-on.d"/* /etc/predator/turbo-on.d/*; do
+                    [ -x "$h" ] && [ -f "$h" ] && "$h" &>/dev/null || true
+                done
+            else
+                command -v powerprofilesctl >/dev/null 2>&1 && powerprofilesctl set balanced 2>/dev/null || true
+                for h in "${HOME}/.config/predator/turbo-off.d"/* /etc/predator/turbo-off.d/*; do
+                    [ -x "$h" ] && [ -f "$h" ] && "$h" &>/dev/null || true
+                done
+            fi
             return 0
         else
             echo "Error: Failed to write to $SYSFS_TURBO" >&2
