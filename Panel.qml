@@ -26,8 +26,7 @@ Panel {
   property string gpuName: "GeForce RTX 2060"
   property string cpuClockGhz: "4.00"
 
-  readonly property string pluginDir: Quickshell.env("HOME") + "/.config/omarchy/plugins/local.predator"
-  readonly property string dataScript: pluginDir + "/bin/predator-data"
+  readonly property string dataScript: Qt.resolvedUrl("bin/predator-data").toString().replace(/^file:\/\//, "")
 
   function toggleTurbo() {
     // Instant optimistic update for responsiveness

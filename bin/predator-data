@@ -5,19 +5,16 @@ SYSFS_TURBO="/sys/devices/platform/acer-wmi/turbo_mode"
 
 write_turbo() {
     local val="$1"
-    if [ ! -f "$SYSFS_TURBO" ]; then
-        return 1
-    fi
+    # Restrict to an exact allowlist of 0 or 1
+    case "$val" in
+        0|1) ;;
+        *) return 1 ;;
+    esac
+
+    [ -f "$SYSFS_TURBO" ] || return 1
 
     if [ -w "$SYSFS_TURBO" ]; then
-        echo "$val" > "$SYSFS_TURBO" 2>/dev/null
-    else
-        # If sysfs is not yet world-writable, use pkexec for non-hanging polkit prompt
-        if command -v pkexec >/dev/null 2>&1 && [ -n "$WAYLAND_DISPLAY" ]; then
-            pkexec sh -c "echo $val > $SYSFS_TURBO" 2>/dev/null || true
-        else
-            echo "$val" > "$SYSFS_TURBO" 2>/dev/null || true
-        fi
+        printf '%s\n' "$val" > "$SYSFS_TURBO" 2>/dev/null || true
     fi
 }
 
@@ -25,19 +22,26 @@ write_turbo() {
 if [ "$1" = "--toggle" ]; then
     if [ -f "$SYSFS_TURBO" ]; then
         VAL=$(cat "$SYSFS_TURBO" 2>/dev/null || echo 0)
-        if [ "$VAL" = "1" ]; then
-            write_turbo 0
-        else
-            write_turbo 1
-        fi
+        case "$VAL" in
+            1) write_turbo 0 ;;
+            *) write_turbo 1 ;;
+        esac
     fi
     exit 0
 fi
 
+# Handle set action if requested - validate against exact allowlist
 if [ "$1" = "--set" ]; then
-    TARGET="${2:-0}"
-    write_turbo "$TARGET"
-    exit 0
+    case "$2" in
+        0|1)
+            write_turbo "$2"
+            exit 0
+            ;;
+        *)
+            echo "Error: --set argument must be exactly 0 or 1" >&2
+            exit 1
+            ;;
+    esac
 fi
 
 # 1. Read Turbo status
