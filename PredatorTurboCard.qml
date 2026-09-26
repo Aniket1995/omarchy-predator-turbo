@@ -94,7 +94,7 @@ BorderSurface {
         id: pillMouse
         anchors.fill: parent
         hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
+        cursorShape: root.panelRoot.turboWritable ? Qt.PointingHandCursor : Qt.ForbiddenCursor
         onClicked: root.panelRoot.toggleTurbo()
       }
     }
@@ -121,10 +121,12 @@ BorderSurface {
       Text {
         width: parent.width
         elide: Text.ElideRight
-        text: root.panelRoot.turboActive ? "Max Fans • Overclock" : "Auto curve • Stock clocks"
+        text: !root.panelRoot.turboWritable
+          ? "Read-only • udev rule required"
+          : (root.panelRoot.turboActive ? "Max Fans • Overclock" : "Auto curve • Stock clocks")
         font.family: root.panelRoot.bar ? root.panelRoot.bar.fontFamily : Style.font.family
         font.pixelSize: Style.font.caption
-        color: Qt.darker(root.panelRoot.bar ? root.panelRoot.bar.foreground : Color.foreground, 1.4)
+        color: !root.panelRoot.turboWritable ? Color.urgent : Qt.darker(root.panelRoot.bar ? root.panelRoot.bar.foreground : Color.foreground, 1.4)
       }
     }
   }

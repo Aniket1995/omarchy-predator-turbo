@@ -47,9 +47,27 @@ omarchy plugin remove predator-turbo
 
 ---
 
-## 📋 Prerequisites
+## 📋 Prerequisites & Permissions Setup
 
 This plugin communicates with `/sys/devices/platform/acer-wmi/turbo_mode` and `/sys/class/hwmon/`. Ensure the `facer` DKMS module or an ACPI driver providing this interface is active on your Predator laptop.
+
+### Sudoless Hardware Write Access
+
+To allow standard user desktop sessions to switch Turbo mode without requiring root or password prompts, grant write permission to the sysfs node using either systemd-tmpfiles or udev:
+
+**Option A: systemd-tmpfiles (Recommended)**
+```bash
+echo 'z /sys/devices/platform/acer-wmi/turbo_mode 0666 - - -' | sudo tee /etc/tmpfiles.d/acer-turbo.conf
+sudo systemd-tmpfiles --create
+```
+
+**Option B: udev rule**
+```bash
+echo 'ACTION=="add|change", SUBSYSTEM=="platform", KERNEL=="acer-wmi", RUN+="/bin/chmod 0666 /sys/devices/platform/acer-wmi/turbo_mode"' | sudo tee /etc/udev/rules.d/99-acer-turbo.rules
+sudo udevadm control --reload && sudo udevadm trigger
+```
+
+If write access is not configured, the plugin cleanly operates in read-only telemetry and monitoring mode with clear status indication.
 
 ---
 

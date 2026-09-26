@@ -17,6 +17,8 @@ Panel {
 
   // Hardware telemetry state
   property bool turboActive: false
+  property bool turboAvailable: true
+  property bool turboWritable: true
   property int cpuFanRpm: 0
   property int gpuFanRpm: 0
   property int gpuClockMhz: 300
@@ -29,10 +31,15 @@ Panel {
   readonly property string dataScript: Qt.resolvedUrl("bin/predator-data").toString().replace(/^file:\/\//, "")
 
   function toggleTurbo() {
-    // Instant optimistic update for responsiveness
+    if (!root.turboWritable) {
+      // Sysfs node is not writable: trigger immediate telemetry re-fetch to reflect reality
+      fetchTelemetry()
+      return
+    }
+    // Optimistic toggle reconciled by telemetry proc
     root.turboActive = !root.turboActive
     Util.execDetached(dataScript + " --toggle")
-    refreshTimer.interval = 400
+    refreshTimer.interval = 350
     refreshTimer.restart()
   }
 
@@ -40,6 +47,8 @@ Panel {
     var data = Model.parseTelemetry(rawText)
     if (!data) return
     root.turboActive = data.turbo === true
+    if (data.turbo_available !== undefined) root.turboAvailable = data.turbo_available === true
+    if (data.turbo_writable !== undefined) root.turboWritable = data.turbo_writable === true
     root.cpuFanRpm = Number(data.cpu_fan_rpm) || 0
     root.gpuFanRpm = Number(data.gpu_fan_rpm) || 0
     root.gpuClockMhz = Number(data.gpu_mhz) || 0

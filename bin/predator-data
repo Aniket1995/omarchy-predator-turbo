@@ -11,22 +11,35 @@ write_turbo() {
         *) return 1 ;;
     esac
 
-    [ -f "$SYSFS_TURBO" ] || return 1
+    [ -f "$SYSFS_TURBO" ] || {
+        echo "Error: $SYSFS_TURBO does not exist" >&2
+        return 1
+    }
 
     if [ -w "$SYSFS_TURBO" ]; then
-        printf '%s\n' "$val" > "$SYSFS_TURBO" 2>/dev/null || true
+        if printf '%s\n' "$val" > "$SYSFS_TURBO"; then
+            return 0
+        else
+            echo "Error: Failed to write to $SYSFS_TURBO" >&2
+            return 1
+        fi
+    else
+        echo "Error: $SYSFS_TURBO is not writable. Configure udev rule or run with appropriate permissions." >&2
+        return 1
     fi
 }
 
 # Handle toggle action if requested
 if [ "$1" = "--toggle" ]; then
-    if [ -f "$SYSFS_TURBO" ]; then
-        VAL=$(cat "$SYSFS_TURBO" 2>/dev/null || echo 0)
-        case "$VAL" in
-            1) write_turbo 0 ;;
-            *) write_turbo 1 ;;
-        esac
+    if [ ! -f "$SYSFS_TURBO" ]; then
+        echo "Error: $SYSFS_TURBO does not exist" >&2
+        exit 1
     fi
+    VAL=$(cat "$SYSFS_TURBO" 2>/dev/null || echo 0)
+    case "$VAL" in
+        1) write_turbo 0 || exit 1 ;;
+        *) write_turbo 1 || exit 1 ;;
+    esac
     exit 0
 fi
 
@@ -34,7 +47,7 @@ fi
 if [ "$1" = "--set" ]; then
     case "$2" in
         0|1)
-            write_turbo "$2"
+            write_turbo "$2" || exit 1
             exit 0
             ;;
         *)
@@ -103,9 +116,16 @@ if [ "$COUNT" -gt 0 ]; then
 fi
 
 # 5. Output JSON
+AVAILABLE=false
+WRITABLE=false
+[ -f "$SYSFS_TURBO" ] && AVAILABLE=true
+[ -w "$SYSFS_TURBO" ] && WRITABLE=true
+
 cat << EOF
 {
   "turbo": $TURBO,
+  "turbo_available": $AVAILABLE,
+  "turbo_writable": $WRITABLE,
   "cpu_fan_rpm": $CPU_RPM,
   "gpu_fan_rpm": $GPU_RPM,
   "gpu_mhz": $GPU_MHZ,
