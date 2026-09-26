@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/predator_logo.png" width="130" alt="Predator Turbo Logo" />
+</p>
+
 # Omarchy Predator Turbo Plugin (`predator-turbo`)
 
 A native, first-class **Omarchy (Quickshell)** bar widget and interactive hardware control center for **Acer Predator Helios 300 (PH315-52)** and related Acer Predator gaming laptops.
